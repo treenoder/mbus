@@ -1,4 +1,4 @@
-name: GitHub Actions Demo
+name: Test and lint
 run-name: ${{ github.actor }} is testing and linting the codebase
 on: [ push ]
 jobs:
@@ -20,4 +20,11 @@ jobs:
       - name: Display Go version
         run: go version
       - name: Run tests
-        run: go test -v ./...
+        run: go test -v ./... -race
+      - name: Lint code with vet
+        run: go vet ./...
+      - name: Run govulncheck
+        uses: golang/govulncheck-action@v1
+        with:
+          go-version-input: ${{ matrix.go }}
+          go-package: ./...
