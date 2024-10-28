@@ -16,5 +16,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go }}
+          cache: false
       - name: Display Go version
         run: go version
