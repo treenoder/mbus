@@ -3,6 +3,7 @@ package mbus
 import (
 	"context"
 	"errors"
+	"github.com/stretchr/testify/require"
 	"sync"
 	"testing"
 	"time"
@@ -30,7 +31,7 @@ func (m *mockCommand) GetName() string {
 	return m.name
 }
 
-func (m *mockCommand) Execute(ctx context.Context) ([]Event, error) {
+func (m *mockCommand) Execute(_ context.Context) ([]Event, error) {
 	if m.execWait > 0 {
 		time.Sleep(m.execWait)
 	}
@@ -46,36 +47,26 @@ func TestNewBus(t *testing.T) {
 		}
 
 		bus := NewBus(customLogger)
-		if bus.log == nil {
-			t.Error("Expected custom logger to be set")
-		}
+		require.NotNil(t, bus)
+		require.NotNil(t, bus.log)
 
 		// Test default fields
-		if len(bus.handlers) != 0 {
-			t.Error("Expected handlers to be initialized")
-		}
-		if len(bus.middlewares) != 0 {
-			t.Error("Expected middlewares to be initialized")
-		}
+		require.Len(t, bus.handlers, 0)
+		require.Len(t, bus.middlewares, 0)
 
 		// Test logging
 		bus.log("Test log")
-		if len(logged) != 1 || logged[0] != "Test log" {
-			t.Error("Expected logger to capture logs")
-		}
+		require.Len(t, logged, 1)
+		require.Equal(t, "Test log", logged[0].(string))
 	})
 
 	t.Run("With nil logger", func(t *testing.T) {
 		bus := NewBus(nil)
-		if bus.log == nil {
-			t.Error("Expected logger to be initialized")
-		}
+		require.NotNil(t, bus.log)
 
 		// Ensure the default logger does not panic when called
 		defer func() {
-			if r := recover(); r != nil {
-				t.Error("Default logger should not panic")
-			}
+			require.Nil(t, recover())
 		}()
 		bus.log("Default logger test")
 	})
@@ -98,22 +89,14 @@ func TestRegisterHandler(t *testing.T) {
 	bus.muh.RLock()
 	defer bus.muh.RUnlock()
 	handlers, exists := bus.handlers[eventType]
-	if !exists {
-		t.Fatalf("Handler for event type %s not registered", eventType)
-	}
-	if len(handlers) != 1 {
-		t.Fatalf("Expected 1 handler, got %d", len(handlers))
-	}
+	require.True(t, exists, "Handler for event type %s not registered", eventType)
+	require.Len(t, handlers, 1, "Expected 1 handler, got %d", len(handlers))
 
 	// Dispatch event to trigger handler
 	event := &mockEvent{eventType: eventType, payload: "payload"}
 	err := bus.dispatch(context.Background(), event)
-	if err != nil {
-		t.Errorf("Unexpected error during dispatch: %v", err)
-	}
-	if !handlerCalled {
-		t.Error("Expected handler to be called")
-	}
+	require.NoError(t, err, "Unexpected error during dispatch")
+	require.True(t, handlerCalled, "Expected handler to be called")
 }
 
 // TestUseMiddleware tests the UseMiddleware method
@@ -154,9 +137,7 @@ func TestUseMiddleware(t *testing.T) {
 	// Dispatch event to trigger handler with middleware
 	event := &mockEvent{eventType: eventType, payload: "test"}
 	err := bus.dispatch(context.Background(), event)
-	if err != nil {
-		t.Errorf("Unexpected error during dispatch: %v", err)
-	}
+	require.NoError(t, err, "Unexpected error during dispatch")
 
 	// Verify middleware order
 	expectedOrder := []string{
@@ -166,13 +147,9 @@ func TestUseMiddleware(t *testing.T) {
 		"mw2_after",
 		"mw1_after",
 	}
-	if len(middlewareOrder) != len(expectedOrder) {
-		t.Fatalf("Expected middleware order %v, got %v", expectedOrder, middlewareOrder)
-	}
+	require.EqualValues(t, expectedOrder, middlewareOrder)
 	for i, v := range expectedOrder {
-		if middlewareOrder[i] != v {
-			t.Errorf("Expected middlewareOrder[%d] = %s, got %s", i, v, middlewareOrder[i])
-		}
+		require.Equal(t, v, middlewareOrder[i], "Expected middlewareOrder[%d] = %s, got %s", i, v, middlewareOrder[i])
 	}
 }
 
@@ -196,12 +173,8 @@ func TestExecuteCommand(t *testing.T) {
 	}
 
 	err := bus.ExecuteCommand(context.Background(), cmd)
-	if err != nil {
-		t.Errorf("Unexpected error during ExecuteCommand: %v", err)
-	}
-	if !handlerCalled {
-		t.Error("Expected handler to be called by ExecuteCommand")
-	}
+	require.NoError(t, err, "Unexpected error during ExecuteCommand")
+	require.True(t, handlerCalled, "Expected handler to be called by ExecuteCommand")
 }
 
 // TestDispatchNoHandlers tests dispatching an event with no handlers
@@ -211,13 +184,9 @@ func TestDispatchNoHandlers(t *testing.T) {
 	event := &mockEvent{eventType: eventType, payload: "test"}
 
 	err := bus.dispatch(context.Background(), event)
-	if err == nil {
-		t.Fatal("Expected error when dispatching event with no handlers")
-	}
+	require.Error(t, err, "Expected error when dispatching event with no handlers")
 	expectedErrMsg := "no handlers registered for event: no_handler_event"
-	if err.Error() != expectedErrMsg {
-		t.Errorf("Expected error message '%s', got '%s'", expectedErrMsg, err.Error())
-	}
+	require.Equal(t, expectedErrMsg, err.Error(), "Expected error message '%s', got '%s'", expectedErrMsg, err.Error())
 }
 
 // TestHandlerError tests a handler returning an error
@@ -234,12 +203,8 @@ func TestHandlerError(t *testing.T) {
 	event := &mockEvent{eventType: eventType, payload: "test"}
 
 	err := bus.dispatch(context.Background(), event)
-	if err == nil {
-		t.Fatal("Expected error from handler")
-	}
-	if err.Error() != "handler error" {
-		t.Errorf("Expected 'handler error', got '%s'", err.Error())
-	}
+	require.Error(t, err, "Expected error from handler")
+	require.Equal(t, "handler error", err.Error(), "Expected 'handler error', got '%s'", err.Error())
 }
 
 // TestMiddlewareError tests middleware handling when next handler returns an error
@@ -264,12 +229,8 @@ func TestMiddlewareError(t *testing.T) {
 	event := &mockEvent{eventType: eventType, payload: "test"}
 
 	err := bus.dispatch(context.Background(), event)
-	if err == nil {
-		t.Fatal("Expected error from handler through middleware")
-	}
-	if err.Error() != "handler error" {
-		t.Errorf("Expected 'handler error', got '%s'", err.Error())
-	}
+	require.Error(t, err, "Expected error from handler through middleware")
+	require.Equal(t, "handler error", err.Error(), "Expected 'handler error', got '%s'", err.Error())
 }
 
 // TestConcurrentDispatch tests dispatching events concurrently
@@ -299,16 +260,12 @@ func TestConcurrentDispatch(t *testing.T) {
 	event := &mockEvent{eventType: eventType, payload: "test"}
 
 	err := bus.dispatch(context.Background(), event)
-	if err != nil {
-		t.Errorf("Unexpected error during dispatch: %v", err)
-	}
+	require.NoError(t, err, "Unexpected error during dispatch")
 
 	// Verify all handlers were called
 	mu.Lock()
 	defer mu.Unlock()
-	if handlerCall != numHandlers {
-		t.Errorf("Expected %d handler calls, got %d", numHandlers, handlerCall)
-	}
+	require.Equal(t, numHandlers, handlerCall, "Expected %d handler calls, got %d", numHandlers, handlerCall)
 }
 
 // TestExecuteCommandWithExecutionError tests ExecuteCommand when command execution returns an error
@@ -320,12 +277,8 @@ func TestExecuteCommandWithExecutionError(t *testing.T) {
 	}
 
 	err := bus.ExecuteCommand(context.Background(), cmd)
-	if err == nil {
-		t.Fatal("Expected error from ExecuteCommand")
-	}
-	if err.Error() != "execution failed" {
-		t.Errorf("Expected 'execution failed', got '%s'", err.Error())
-	}
+	require.Error(t, err, "Expected error from ExecuteCommand")
+	require.Equal(t, "execution failed", err.Error(), "Expected 'execution failed', got '%s'", err.Error())
 }
 
 // TestMiddlewareOrdering tests that middleware are applied in the correct order
@@ -381,9 +334,7 @@ func TestMiddlewareOrdering(t *testing.T) {
 	// Dispatch event
 	event := &mockEvent{eventType: eventType, payload: "test"}
 	err := bus.dispatch(context.Background(), event)
-	if err != nil {
-		t.Errorf("Unexpected error during dispatch: %v", err)
-	}
+	require.NoError(t, err, "Unexpected error during dispatch")
 
 	// Verify order
 	expectedOrder := []string{
@@ -396,13 +347,9 @@ func TestMiddlewareOrdering(t *testing.T) {
 
 	mu.Lock()
 	defer mu.Unlock()
-	if len(order) != len(expectedOrder) {
-		t.Fatalf("Expected order %v, got %v", expectedOrder, order)
-	}
+	require.EqualValues(t, expectedOrder, order)
 	for i, v := range expectedOrder {
-		if order[i] != v {
-			t.Errorf("At position %d, expected '%s', got '%s'", i, v, order[i])
-		}
+		require.Equal(t, v, order[i], "Expected order[%d] = %s, got %s", i, v, order[i])
 	}
 }
 
@@ -423,9 +370,7 @@ func TestExecuteComplexCommand(t *testing.T) {
 	}
 
 	handler1 := func(ctx context.Context, event Event) ([]Event, []Command, error) {
-		if event != event1 {
-			t.Fatal("Expected event1 to be processed by handler1")
-		}
+		require.Equal(t, event1, event, "Expected event1 to be processed by handler1")
 		return []Event{event2}, []Command{cmd2}, nil
 	}
 	receivedEvents := make(map[Event]struct{})
@@ -439,18 +384,12 @@ func TestExecuteComplexCommand(t *testing.T) {
 	bus.RegisterHandler(event3.eventType, handler2)
 
 	err := bus.ExecuteCommand(context.Background(), cmd1)
-	if err != nil {
-		t.Fatalf("Unexpected error during ExecuteCommand: %v", err)
-	}
-	if len(receivedEvents) != 2 {
-		t.Fatalf("Expected 2 events to be processed, got %d", len(receivedEvents))
-	}
-	if _, ok := receivedEvents[event2]; !ok {
-		t.Error("Expected event2 to be processed")
-	}
-	if _, ok := receivedEvents[event3]; !ok {
-		t.Error("Expected event3 to be processed")
-	}
+	require.NoError(t, err, "Unexpected error during ExecuteCommand")
+	require.Len(t, receivedEvents, 2, "Expected 2 events to be processed")
+	_, ok := receivedEvents[event2]
+	require.True(t, ok, "Expected event2 to be processed")
+	_, ok = receivedEvents[event3]
+	require.True(t, ok, "Expected event3 to be processed")
 }
 
 // TestAggregatesErrors tests that ExecuteCommand aggregates errors from all handlers of an event
@@ -491,16 +430,8 @@ func TestExecuteCommandAggregatesErrors(t *testing.T) {
 	bus.RegisterHandler(event1.eventType, handler3)
 
 	err := bus.ExecuteCommand(context.Background(), cmd1)
-	if err == nil {
-		t.Fatal("Expected error from ExecuteCommand")
-	}
-	if !errors.Is(err, err1) {
-		t.Errorf("Expected error1, got %v", err)
-	}
-	if !errors.Is(err, err2) {
-		t.Errorf("Expected error2, got %v", err)
-	}
-	if !errors.Is(err, err3) {
-		t.Errorf("Expected error3, got %v", err)
-	}
+	require.Error(t, err, "Expected error from ExecuteCommand")
+	require.ErrorIs(t, err, err1, "Expected error1")
+	require.ErrorIs(t, err, err2, "Expected error2")
+	require.ErrorIs(t, err, err3, "Expected error3")
 }
