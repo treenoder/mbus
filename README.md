@@ -1,5 +1,8 @@
 # mbus – Event Bus Library
 
+[![Test](https://github.com/treenoder/mbus/actions/workflows/test.yml/badge.svg)](https://github.com/treenoder/mbus/actions/workflows/test.yml)
+
+
 This Go library provides an event bus mechanism to manage event handlers, middleware, and command execution. It supports registering handlers for specific events, applying middleware, and executing commands while dispatching the resulting events to the appropriate handlers.
 
 ## Features
