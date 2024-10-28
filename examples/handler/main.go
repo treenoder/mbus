@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/treenoder/bus/v1/mbus"
+	"github.com/treenoder/mbus/mbus"
 )
 
 var h2Error = errors.New("handler2 error")
@@ -28,17 +28,17 @@ func main() {
 	}
 }
 
-func handler1(ctx context.Context, event mbus.Event) ([]mbus.Event, []mbus.Command, error) {
+func handler1(_ context.Context, event mbus.Event) ([]mbus.Event, []mbus.Command, error) {
 	fmt.Println("handler1 called for event", event.GetType())
 	return nil, nil, nil
 }
 
-func handler2(ctx context.Context, event mbus.Event) ([]mbus.Event, []mbus.Command, error) {
+func handler2(_ context.Context, event mbus.Event) ([]mbus.Event, []mbus.Command, error) {
 	fmt.Println("handler2 called for event", event.GetType())
 	return nil, nil, h2Error
 }
 
-func handler3(ctx context.Context, event mbus.Event) ([]mbus.Event, []mbus.Command, error) {
+func handler3(_ context.Context, event mbus.Event) ([]mbus.Event, []mbus.Command, error) {
 	fmt.Println("handler3 called for event", event.GetType())
 	return nil, nil, h3Error
 }
@@ -59,7 +59,7 @@ func (c *MyCommand) GetName() string {
 }
 
 // Execute executes simple command with one event
-func (c *MyCommand) Execute(ctx context.Context) ([]mbus.Event, error) {
+func (c *MyCommand) Execute(_ context.Context) ([]mbus.Event, error) {
 	fmt.Println("Executing command", c.GetName())
 	return []mbus.Event{Event1{}}, nil
 }

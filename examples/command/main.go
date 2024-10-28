@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/treenoder/bus/v1/mbus"
+	"github.com/treenoder/mbus/mbus"
 )
 
 func main() {
@@ -24,7 +24,7 @@ func (c *MyCommand) GetName() string {
 }
 
 // Execute executes simple command with no events.
-func (c *MyCommand) Execute(ctx context.Context) ([]mbus.Event, error) {
+func (c *MyCommand) Execute(_ context.Context) ([]mbus.Event, error) {
 	fmt.Println("Executing command", c.GetName())
 	return nil, nil
 }
