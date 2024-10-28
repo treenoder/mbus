@@ -19,3 +19,5 @@ jobs:
           cache: false
       - name: Display Go version
         run: go version
+      - name: Run tests
+        run: go test -v ./...
